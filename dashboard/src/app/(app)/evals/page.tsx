@@ -13,6 +13,7 @@ import {
 import { toast } from 'sonner'
 import { Play, CheckCircle2, XCircle } from 'lucide-react'
 import type { EvalRun, EvalRunStatus } from '@/lib/types'
+import { useCurrentRole, canEdit, VIEWER_DISABLED_TOOLTIP } from '@/components/role-gate'
 
 const STATUS_STYLES: Record<EvalRunStatus, string> = {
   queued: 'bg-zinc-500 text-white',
@@ -25,6 +26,8 @@ const STATUS_STYLES: Record<EvalRunStatus, string> = {
 const ACTIVE_STATUSES = new Set<EvalRunStatus>(['queued', 'running'])
 
 export default function EvalsPage() {
+  const role = useCurrentRole()
+  const editable = canEdit(role)
   const [runs, setRuns] = useState<EvalRun[]>([])
   const [loading, setLoading] = useState(true)
   const [triggering, setTriggering] = useState(false)
@@ -99,7 +102,11 @@ export default function EvalsPage() {
             Run the goldenset against the active prompt. Results appear within ~60s.
           </p>
         </div>
-        <Button onClick={trigger} disabled={triggering}>
+        <Button
+          onClick={trigger}
+          disabled={triggering || !editable}
+          title={editable ? undefined : VIEWER_DISABLED_TOOLTIP}
+        >
           <Play size={14} className="mr-1.5" />
           {triggering ? 'Queuing…' : 'Run goldenset'}
         </Button>

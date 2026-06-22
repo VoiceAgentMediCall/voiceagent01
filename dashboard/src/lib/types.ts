@@ -37,6 +37,7 @@ export type CallLog = {
   outcome_source: OutcomeSource | null
   reason: string | null
   transcript: TranscriptMessage[] | null
+  legacy_transcript_text: string | null
   duration_sec: number | null
   prompt_version: number | null
   stack: 'livekit' | 'vapi'
@@ -108,4 +109,44 @@ export type PromptVersionDetail = Prompt & {
     email: string
     display_name: string | null
   } | null
+}
+
+export type UserRole = 'admin' | 'editor' | 'viewer' | 'pending'
+
+export type MemberRow = {
+  id: string
+  email: string
+  display_name: string | null
+  role: UserRole
+  is_master: boolean
+  created_at: string
+  invited_by: { id: string; email: string; display_name: string | null } | null
+  invited_at: string | null
+}
+
+export type PendingInvite = {
+  id: string
+  email: string
+  role: 'admin' | 'editor' | 'viewer'
+  invited_at: string
+  notes: string | null
+  invited_by_user?: { id: string; email: string; display_name: string | null } | null
+}
+
+export type AuditLogEntry = {
+  id: string
+  action:
+    | 'invite_added'
+    | 'invite_removed'
+    | 'user_role_changed'
+    | 'user_removed'
+    | 'first_sign_in'
+  actor_user_id: string | null
+  target_email: string | null
+  target_user_id: string | null
+  previous_role: string | null
+  new_role: string | null
+  notes: string | null
+  created_at: string
+  actor: { id: string; email: string; display_name: string | null } | null
 }

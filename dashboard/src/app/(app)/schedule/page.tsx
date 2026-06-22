@@ -13,6 +13,7 @@ import {
 import { toast } from 'sonner'
 import { Trash2, UserPlus } from 'lucide-react'
 import type { Parent, ParentDraft } from '@/lib/types'
+import { useCurrentRole, canEdit, VIEWER_DISABLED_TOOLTIP } from '@/components/role-gate'
 
 const EMPTY: ParentDraft = {
   name: '',
@@ -24,6 +25,8 @@ const EMPTY: ParentDraft = {
 }
 
 export default function SchedulePage() {
+  const role = useCurrentRole()
+  const editable = canEdit(role)
   const [parents, setParents] = useState<Parent[]>([])
   const [loading, setLoading] = useState(true)
   const [draft, setDraft] = useState<ParentDraft>(EMPTY)
@@ -102,29 +105,31 @@ export default function SchedulePage() {
         <span className="text-sm text-muted-foreground">{parents.length} parent{parents.length === 1 ? '' : 's'}</span>
       </div>
 
-      <Card className="p-5">
-        <form onSubmit={add} className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
-          <FormField label="Name" required>
-            <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-          </FormField>
-          <FormField label="Phone (E.164)" required>
-            <Input placeholder="+91..." value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
-          </FormField>
-          <FormField label="Drug" required>
-            <Input value={draft.drug_name} onChange={(e) => setDraft({ ...draft, drug_name: e.target.value })} />
-          </FormField>
-          <FormField label="Time">
-            <Input type="time" value={draft.scheduled_time ?? ''} onChange={(e) => setDraft({ ...draft, scheduled_time: e.target.value })} />
-          </FormField>
-          <FormField label="Caregiver email">
-            <Input type="email" value={draft.caregiver_email ?? ''} onChange={(e) => setDraft({ ...draft, caregiver_email: e.target.value })} />
-          </FormField>
-          <Button type="submit" disabled={adding}>
-            <UserPlus size={14} className="mr-1.5" />
-            {adding ? 'Adding…' : 'Add'}
-          </Button>
-        </form>
-      </Card>
+      {editable && (
+        <Card className="p-5">
+          <form onSubmit={add} className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
+            <FormField label="Name" required>
+              <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+            </FormField>
+            <FormField label="Phone (E.164)" required>
+              <Input placeholder="+91..." value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
+            </FormField>
+            <FormField label="Drug" required>
+              <Input value={draft.drug_name} onChange={(e) => setDraft({ ...draft, drug_name: e.target.value })} />
+            </FormField>
+            <FormField label="Time">
+              <Input type="time" value={draft.scheduled_time ?? ''} onChange={(e) => setDraft({ ...draft, scheduled_time: e.target.value })} />
+            </FormField>
+            <FormField label="Caregiver email">
+              <Input type="email" value={draft.caregiver_email ?? ''} onChange={(e) => setDraft({ ...draft, caregiver_email: e.target.value })} />
+            </FormField>
+            <Button type="submit" disabled={adding}>
+              <UserPlus size={14} className="mr-1.5" />
+              {adding ? 'Adding…' : 'Add'}
+            </Button>
+          </form>
+        </Card>
+      )}
 
       <div className="border rounded-md">
         <Table>
@@ -154,13 +159,21 @@ export default function SchedulePage() {
                 <TableCell>
                   <button
                     onClick={() => toggleActive(p)}
-                    className={`text-xs px-2 py-1 rounded ${p.active ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'}`}
+                    disabled={!editable}
+                    title={editable ? undefined : VIEWER_DISABLED_TOOLTIP}
+                    className={`text-xs px-2 py-1 rounded ${p.active ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'} disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     {p.active ? 'Active' : 'Paused'}
                   </button>
                 </TableCell>
                 <TableCell>
-                  <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(p)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setConfirmDelete(p)}
+                    disabled={!editable}
+                    title={editable ? undefined : VIEWER_DISABLED_TOOLTIP}
+                  >
                     <Trash2 size={14} />
                   </Button>
                 </TableCell>

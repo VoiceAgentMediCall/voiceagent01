@@ -1,12 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 
 export async function POST() {
+  const auth = await requireRole('admin', 'editor')
+  if (!auth.ok) return auth.response
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-  }
 
   // Snapshot the currently active prompt version into the run
   const { data: activePrompt } = await supabase
@@ -18,7 +17,7 @@ export async function POST() {
   const { data, error } = await supabase
     .from('eval_runs')
     .insert({
-      triggered_by: user.id,
+      triggered_by: auth.userId,
       prompt_version: activePrompt?.version ?? null,
       status: 'queued',
     })

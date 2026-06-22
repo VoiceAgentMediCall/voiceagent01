@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import type { Prompt, PromptDraft } from '@/lib/types'
 import { VersionHistory } from '@/components/version-history'
+import { useCurrentRole, canEdit, VIEWER_DISABLED_TOOLTIP } from '@/components/role-gate'
 
 const EMPTY: PromptDraft = {
   system_prompt: '',
@@ -18,6 +19,8 @@ const EMPTY: PromptDraft = {
 }
 
 export default function AdminPage() {
+  const role = useCurrentRole()
+  const editable = canEdit(role)
   const [active, setActive] = useState<Prompt | null>(null)
   const [draft, setDraft] = useState<PromptDraft>(EMPTY)
   const [loading, setLoading] = useState(true)
@@ -95,7 +98,11 @@ export default function AdminPage() {
               )}
             </div>
           </div>
-          <Button onClick={save} disabled={saving}>
+          <Button
+            onClick={save}
+            disabled={!editable || saving}
+            title={editable ? undefined : VIEWER_DISABLED_TOOLTIP}
+          >
             {saving ? 'Saving…' : 'Save as new version'}
           </Button>
         </div>
@@ -107,6 +114,7 @@ export default function AdminPage() {
               value={draft.first_message}
               onChange={(e) => setDraft({ ...draft, first_message: e.target.value })}
               placeholder="नमस्ते {parent_name} जी, मैं मेडीकॉल से बोल रहा हूँ…"
+              readOnly={!editable}
             />
             <p className="text-xs text-muted-foreground">
               What the agent says first. Supports {'{parent_name}'} and {'{drug_name}'} templating.
@@ -121,6 +129,7 @@ export default function AdminPage() {
               rows={24}
               className="font-mono text-xs"
               placeholder="आप मेडीकॉल का AI एजेंट हैं…"
+              readOnly={!editable}
             />
             <p className="text-xs text-muted-foreground">
               Devanagari only. Reference {'{drug_name}'} in scripts. Must instruct the LLM to call
@@ -149,6 +158,7 @@ export default function AdminPage() {
                       variables: { ...draft.variables, [k]: e.target.value },
                     })
                   }
+                  readOnly={!editable}
                 />
               </div>
             ))}
@@ -164,6 +174,7 @@ export default function AdminPage() {
             }
             rows={3}
             placeholder="What changed in this version, and why."
+            readOnly={!editable}
           />
         </Card>
       </div>

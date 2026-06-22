@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 
 const E164 = /^\+[1-9]\d{6,14}$/
@@ -7,9 +8,9 @@ type RouteContext = { params: Promise<{ id: string }> }
 
 export async function PATCH(req: Request, { params }: RouteContext) {
   const { id } = await params
+  const auth = await requireRole('admin', 'editor')
+  if (!auth.ok) return auth.response
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   const body = await req.json()
   const updates: Record<string, unknown> = {}
@@ -48,9 +49,9 @@ export async function PATCH(req: Request, { params }: RouteContext) {
 
 export async function DELETE(_req: Request, { params }: RouteContext) {
   const { id } = await params
+  const auth = await requireRole('admin', 'editor')
+  if (!auth.ok) return auth.response
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   const { error } = await supabase.from('parents').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

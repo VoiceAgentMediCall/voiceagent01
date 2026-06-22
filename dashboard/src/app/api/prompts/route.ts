@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
@@ -16,11 +17,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const auth = await requireRole('admin', 'editor')
+  if (!auth.ok) return auth.response
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-  }
 
   const body = await req.json()
   const { system_prompt, first_message, variables, notes } = body
@@ -55,7 +54,7 @@ export async function POST(req: Request) {
       variables: variables ?? {},
       notes: notes ?? null,
       is_active: true,
-      created_by: user.id,
+      created_by: auth.userId,
     })
     .select()
     .single()

@@ -151,6 +151,11 @@ export default function CallsPage() {
                         {m.text}
                       </div>
                     ))
+                  ) : selected.legacy_transcript_text ? (
+                    <>
+                      <Badge variant="outline" className="mb-2 text-amber-600 border-amber-600">Legacy excerpt</Badge>
+                      <p className="text-sm whitespace-pre-wrap">{selected.legacy_transcript_text}</p>
+                    </>
                   ) : (
                     <span className="text-xs text-muted-foreground">No transcript.</span>
                   )}

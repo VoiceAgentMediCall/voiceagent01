@@ -20,10 +20,13 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { Phone, PhoneOff, Mic } from 'lucide-react'
+import { useCurrentRole, canEdit, VIEWER_DISABLED_TOOLTIP } from '@/components/role-gate'
 
 type TokenResponse = { token: string; url: string; room: string; identity: string }
 
 export default function TestPage() {
+  const role = useCurrentRole()
+  const editable = canEdit(role)
   const [conn, setConn] = useState<TokenResponse | null>(null)
   const [connecting, setConnecting] = useState(false)
 
@@ -59,7 +62,11 @@ export default function TestPage() {
           </p>
         </div>
         {!conn ? (
-          <Button onClick={connect} disabled={connecting}>
+          <Button
+            onClick={connect}
+            disabled={connecting || !editable}
+            title={editable ? undefined : VIEWER_DISABLED_TOOLTIP}
+          >
             <Phone size={14} className="mr-1.5" />
             {connecting ? 'Connecting…' : 'Connect to agent'}
           </Button>

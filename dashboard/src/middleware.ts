@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
-const PUBLIC_PATHS = ['/login', '/auth', '/api/webhook']
+const PUBLIC_PATHS = ['/login', '/auth', '/api/webhook', '/not-authorized']
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request })
@@ -36,6 +36,18 @@ export async function middleware(request: NextRequest) {
 
   if (!user && !isPublic) {
     return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  if (user && !isPublic) {
+    const { data: profile } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (profile?.role === 'pending') {
+      return NextResponse.redirect(new URL('/not-authorized', request.url))
+    }
   }
 
   return response

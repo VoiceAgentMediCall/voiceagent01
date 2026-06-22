@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 
 const E164 = /^\+[1-9]\d{6,14}$/
@@ -18,9 +19,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const auth = await requireRole('admin', 'editor')
+  if (!auth.ok) return auth.response
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   const body = await req.json()
   const { name, phone, drug_name, scheduled_time, caregiver_email, active } = body

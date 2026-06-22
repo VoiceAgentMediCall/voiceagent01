@@ -1,18 +1,15 @@
 import { AccessToken } from 'livekit-server-sdk'
-import { createClient } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 
 export async function GET(req: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-  }
+  const auth = await requireRole('admin', 'editor')
+  if (!auth.ok) return auth.response
 
   const url = new URL(req.url)
   const room = url.searchParams.get('room') ?? `medicall-test-${Date.now()}`
   const identity =
-    url.searchParams.get('identity') ?? user.email ?? `browser-${user.id.slice(0, 8)}`
+    url.searchParams.get('identity') ?? auth.email ?? `browser-${auth.userId.slice(0, 8)}`
 
   // Defense in depth: require the room name to start with 'medicall-' so this
   // token can't be used to join unrelated rooms.

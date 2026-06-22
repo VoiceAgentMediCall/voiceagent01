@@ -11,10 +11,11 @@ Hindi-language outbound voice agent that calls elderly Indian parents to confirm
 | Folder | What's in it |
 |---|---|
 | **`livekit/`** | The Python LiveKit Agent (`agent.py`) — the brain. STT/LLM/TTS wiring, voicemail detection, webhook POST. Run with `python agent.py dev`. Place outbound test calls with `python dial.py`. |
-| **`admin-panel/`** | Streamlit prompt editor (`app.py`). Edit `prompts.yaml` (system prompt + first message + variables) without touching code. Run with `streamlit run app.py`. |
-| **`browser-test/`** | Local browser app to chat with the agent without placing a real phone call. Run with `python server.py`, then open http://localhost:3000. |
+| **`dashboard/`** | Next.js dashboard (live at https://voiceagent01-production.up.railway.app/). Replaces the legacy Streamlit admin panel, FastAPI browser test, and Apps Script webhook. Tabs: `/admin` (Prompt Editor — edits `admin-panel/prompts.yaml`), `/test` (Browser Test), plus the production webhook at `/api/webhook/livekit`. |
+| **`admin-panel/`** | Holds `prompts.yaml` only — the runtime prompt file that `agent.py` reads. Edit it via the dashboard `/admin` tab. (Streamlit UI deprecated 2026-06-22.) |
 | **`evals/`** | Promptfoo regression scenarios (3 YAML cases: confirm / deny / symptom). Run with `promptfoo eval`. |
-| **`scaffolds/`** | Source-of-truth for things deployed outside this repo: `webhook_v2.gs` (Google Apps Script), `*_template.csv` (Sheet column headers). |
+| **`eval-runner/`** | Eval runner harness for the goldenset. |
+| **`supabase/`** | Supabase schema — source of truth for call schedule and call logs (replaces the legacy CSV templates). |
 | **`docs/`** | Active planning + operator docs. See section below for what each is. |
 | **`docs/archive/`** | Vapi-era plans kept for audit trail (pre-migration). |
 | **`docs/research/`** | 5 deep-dive research docs (LiveKit Cloud, Sarvam plugin, Twilio SIP, DX stack, Silero VAD). |
@@ -28,12 +29,14 @@ Hindi-language outbound voice agent that calls elderly Indian parents to confirm
 
 | Step | Command | Where |
 |---|---|---|
-| 1. Install deps (once) | `pip install -r requirements.txt` | inside `livekit/`, `admin-panel/`, `browser-test/` |
-| 2. Boot the agent (leave running) | `python agent.py dev` | `livekit/` |
-| 3. Boot admin UI (leave running) | `streamlit run app.py` → http://localhost:8501 | `admin-panel/` |
-| 4. Boot browser test client (leave running) | `python server.py` → http://localhost:3000 | `browser-test/` |
+| 1. Install agent deps (once) | `pip install -r requirements.txt` | `livekit/` |
+| 2. Install dashboard deps (once) | `npm install` | `dashboard/` |
+| 3. Boot the agent (leave running) | `python agent.py dev` | `livekit/` |
+| 4. Boot the dashboard (leave running) | `npm run dev` → http://localhost:3000 (use `/admin` for prompt editor, `/test` for browser test) | `dashboard/` |
 | 5. Place a real phone call | `python dial.py [+91XXXXXXXXXX]` | `livekit/` |
 | 6. Run regression evals | `promptfoo eval` | `evals/` |
+
+> The production dashboard is deployed at https://voiceagent01-production.up.railway.app/ — LiveKit posts call results to `/api/webhook/livekit` there (replacing the legacy Apps Script webhook).
 
 ---
 
@@ -62,7 +65,7 @@ These live at the repo root, gitignored:
 - `twilio_sip_password.txt` (SIP trunk outbound credential list)
 - `twilio_recovery_code.txt` (2FA recovery)
 - `vapi_api_key.txt` (legacy — Vapi pilot fallback)
-- `livekit/.env` + `browser-test/.env` (runtime env vars)
+- `livekit/.env` + `dashboard/.env.local` (runtime env vars)
 
 ---
 

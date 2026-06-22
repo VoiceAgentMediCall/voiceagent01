@@ -28,10 +28,12 @@ export function Sidebar({ role }: { role: UserRole }) {
   const visibleTabs = tabs.filter((t) => !t.adminOnly || role === 'admin')
 
   return (
-    <aside className="w-56 shrink-0 border-r bg-zinc-950 text-zinc-100 flex flex-col">
-      <div className="p-5 border-b border-zinc-800">
-        <div className="text-lg font-semibold tracking-tight">MediCall</div>
-        <div className="text-[11px] text-zinc-400 mt-0.5">Pilot dashboard</div>
+    <aside className="w-56 shrink-0 border-r border-zinc-800/80 bg-zinc-950 text-zinc-100 flex flex-col">
+      <div className="px-5 py-4 border-b border-zinc-800/80">
+        <div className="text-base font-semibold tracking-tight text-zinc-50">MediCall</div>
+        <div className="text-[10px] uppercase tracking-[0.08em] text-zinc-500 mt-1">
+          Pilot dashboard
+        </div>
       </div>
       <nav className="flex-1 px-2 py-3 space-y-0.5">
         {visibleTabs.map(({ href, label, icon: Icon, adminOnly }) => {
@@ -45,7 +47,7 @@ export function Sidebar({ role }: { role: UserRole }) {
                 active
                   ? adminOnly
                     ? 'bg-amber-900/40 text-amber-200'
-                    : 'bg-zinc-800 text-white'
+                    : 'bg-emerald-600/10 text-emerald-300'
                   : adminOnly
                     ? 'text-amber-400/80 hover:bg-amber-900/30 hover:text-amber-200'
                     : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100'
@@ -57,7 +59,7 @@ export function Sidebar({ role }: { role: UserRole }) {
           )
         })}
       </nav>
-      <div className="p-3 text-[11px] text-zinc-500 border-t border-zinc-800">
+      <div className="px-3 py-3 text-[10px] font-mono uppercase tracking-[0.08em] text-zinc-500 border-t border-zinc-800/80">
         v0.3.0-pilot · {role}
       </div>
     </aside>

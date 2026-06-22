@@ -12,7 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="flex h-screen bg-background">
       <Sidebar role={ctx.role} />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 border-b px-6 flex items-center justify-end shrink-0">
+        <header className="h-14 border-b bg-background/80 backdrop-blur px-6 flex items-center justify-end shrink-0 sticky top-0 z-10">
           <UserMenu email={ctx.email} />
         </header>
         <main className="flex-1 overflow-auto p-6">{children}</main>

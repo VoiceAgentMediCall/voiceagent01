@@ -14,7 +14,7 @@ const execAsync = promisify(exec)
 const SUPABASE_URL = required('SUPABASE_URL')
 const SUPABASE_SERVICE_ROLE_KEY = required('SUPABASE_SERVICE_ROLE_KEY')
 const SUPABASE_DB_URL = required('SUPABASE_DB_URL') // direct connection for LISTEN (port 5432)
-const OPENAI_API_KEY = required('OPENAI_API_KEY')
+const GROQ_API_KEY = required('GROQ_API_KEY')
 const GOLDENSET_PATH =
   process.env.GOLDENSET_PATH ?? path.resolve(__dirname, '../../evals/goldenset.yaml')
 const PORT = parseInt(process.env.PORT ?? '3000', 10)
@@ -131,7 +131,7 @@ async function runEval(evalRunId: string): Promise<void> {
     // 5. Run Promptfoo
     const env = {
       ...process.env,
-      OPENAI_API_KEY,
+      GROQ_API_KEY,
       PROMPTFOO_DISABLE_TELEMETRY: '1',
       PROMPTFOO_NO_COLOR: '1',
     }

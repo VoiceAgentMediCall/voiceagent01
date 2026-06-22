@@ -17,8 +17,9 @@
 #   cd evals
 #   npx promptfoo eval --config goldenset.yaml
 #
-# Requires OPENAI_API_KEY in env (used by both the provider under test and the
-# llm-rubric grader).
+# Requires GROQ_API_KEY in env (used by both the provider under test and the
+# llm-rubric grader). Switched from OpenAI to Groq on 2026-06-22 — free tier
+# covers pilot volume (30 req/min, 14.4k req/day).
 #
 # ============================================================
 # PROVIDER-COUPLED ASSERTIONS — read before changing the provider
@@ -29,8 +30,8 @@
 # templating; the live runtime uses Python `{var}` substitution against the
 # same variables dict — keep the variable NAMES (parent_name, drug_name) in sync.
 #
-# Provider: openai:gpt-4o-mini at temperature 0 — matches the legacy eval
-# config. JS assertions assume the model returns a plain string `output`
+# Provider: groq:llama-3.3-70b-versatile at temperature 0. JS assertions assume
+# the model returns a plain string `output`
 # (no tool_calls in this eval — Phase 0 pilot tests prompt behavior, not
 # the LiveKit @function_tool wiring; that lives in tests/test_voicemail_wiring.py).
 # ============================================================
@@ -38,7 +39,7 @@
 description: MediCall AI Hindi voice agent — Phase 0 golden set (4 scenarios)
 
 providers:
-  - id: openai:gpt-4o-mini
+  - id: groq:llama-3.3-70b-versatile
     config:
       temperature: 0
       max_tokens: 300

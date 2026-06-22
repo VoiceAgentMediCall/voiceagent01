@@ -57,6 +57,69 @@ Hindi-language outbound voice agent that calls elderly Indian parents to confirm
 
 ---
 
+## Team access (Master Control)
+
+Dashboard access uses a strict allowlist + 3-tier role model (admin / editor / viewer) plus a separate `is_master` flag for irrevocable founder access.
+
+### Adding a teammate
+
+1. Sign in to https://voiceagent01-production.up.railway.app/ as an admin
+2. Open the **Master Control** tab (sidebar, top — admins only see it)
+3. Scroll to **Invite a teammate** → enter email + pick a role:
+   - **admin** — everything + Master Control + can invite/remove teammates
+   - **editor** — edit prompts, manage parents, run evals, place test calls
+   - **viewer** — read-only across the dashboard
+4. They sign in via Google OAuth → land in the dashboard with the assigned role
+5. Every invite + role change is recorded in the **Audit log** card at the bottom
+
+### Promoting someone to master admin
+
+Master status is **SQL-Editor-only by design** — there's no UI to grant it. The bar is intentionally high: a compromised/rogue admin can't accidentally make someone untouchable.
+
+Two-step process:
+
+1. **First invite them as admin via Master Control** (steps above) — they sign in once.
+2. **Then in Supabase SQL Editor** (https://supabase.com/dashboard/project/alzdxsjkvkqmvhrmbkrc/sql/new) run:
+   ```sql
+   update public.users
+     set is_master = true
+     where email = 'theperson@example.com';
+
+   -- verify
+   select email, role, is_master from public.users
+     where email = 'theperson@example.com';
+   -- expected: role=admin, is_master=true
+   ```
+3. Refresh `/master` in the dashboard → their row shows a **MASTER** badge next to their role.
+
+### What master status guarantees
+
+- **Cannot be demoted** via the UI (the role Select is disabled with a tooltip)
+- **Cannot be removed** via the UI (the Remove button is disabled)
+- **DB-enforced**: a CHECK constraint (`users_master_implies_admin`) ensures a master row always has `role='admin'`
+- **Multiple masters supported** — co-founders can each have it
+
+### Removing master status
+
+Same SQL Editor path (no UI):
+```sql
+update public.users set is_master = false where email = '...';
+```
+
+After flipping, they can be demoted/removed via Master Control like any other admin.
+
+### Why allowlist + roles + master flag
+
+| Threat | Mitigation |
+|---|---|
+| Random Google account signs in | Lands on `/not-authorized` (not in `allowed_emails`) |
+| Compromised admin invites a rando | Worst case: rando is `viewer`; admin can't auto-promote anyone to master |
+| Compromised admin demotes a founder | Master flag blocks the demotion at API + DB layers |
+| Last admin gets demoted/removed | API rejects with "You're the only admin — promote someone else first" |
+| Master admin clicks Remove on themselves | UI disables the action; API rejects if reached |
+
+---
+
 ## Credentials (NEVER commit)
 
 These live at the repo root, gitignored:

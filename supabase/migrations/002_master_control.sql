@@ -87,7 +87,13 @@ as $$
 declare
   invite_record record;
   assigned_role text;
+  is_invited boolean := false;
 begin
+  -- Phase 1: Look up invite (read-only, no side effects). Defer the
+  -- consume-update until AFTER public.users exists, because
+  -- allowed_emails.consumed_user_id has a FK to public.users(id) — updating
+  -- it before the user row exists would violate the FK and abort the
+  -- transaction, leaving the new auth.users row orphaned.
   select id, role into invite_record
   from public.allowed_emails
   where lower(email) = lower(new.email)
@@ -96,14 +102,12 @@ begin
 
   if found then
     assigned_role := invite_record.role;
-    update public.allowed_emails
-    set consumed_at = now(),
-        consumed_user_id = new.id
-    where id = invite_record.id;
+    is_invited := true;
   else
     assigned_role := 'pending';
   end if;
 
+  -- Phase 2: Create public.users FIRST (FK target for everything that follows).
   insert into public.users (id, email, display_name, role)
   values (
     new.id,
@@ -113,6 +117,15 @@ begin
   )
   on conflict (id) do nothing;
 
+  -- Phase 3: Now safe to consume the invite — the FK target exists.
+  if is_invited then
+    update public.allowed_emails
+    set consumed_at = now(),
+        consumed_user_id = new.id
+    where id = invite_record.id;
+  end if;
+
+  -- Phase 4: Audit log.
   insert into public.audit_log (action, target_email, target_user_id, new_role, notes)
   values (
     'first_sign_in',

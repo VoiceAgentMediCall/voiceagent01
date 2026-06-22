@@ -88,3 +88,24 @@ export type EvalRun = {
   finished_at: string | null
   created_at: string
 }
+
+export type PromptVersionSummary = {
+  id: string
+  version: number
+  is_active: boolean
+  notes: string | null
+  created_at: string
+  created_by_user: {
+    id: string
+    email: string
+    display_name: string | null
+  } | null
+}
+
+export type PromptVersionDetail = Prompt & {
+  created_by_user: {
+    id: string
+    email: string
+    display_name: string | null
+  } | null
+}

@@ -1,0 +1,24 @@
+name: Supabase keepalive
+
+# Pings the Supabase REST endpoint every 5 days so the free-tier project
+# doesn't get auto-paused due to 7-day inactivity. In practice the Railway
+# services hit Supabase continuously and this cron is unnecessary — but it's
+# a $0 belt-and-suspenders against project pauses during long quiet stretches.
+
+on:
+  schedule:
+    - cron: '0 6 */5 * *'  # 06:00 UTC every 5 days
+  workflow_dispatch:         # manual trigger for verification
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST endpoint
+        run: |
+          curl -fsS -X GET \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/users?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}"
+          echo ""
+          echo "Supabase keepalive ping OK"

@@ -1,0 +1,49 @@
+# --- SECRETS (never commit) ---
+*_api_key.txt
+*_credentials.txt
+*_password.txt
+*_recovery_code.txt
+.env
+.env.local
+.env.*.local
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Node ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- LiveKit / Promptfoo / Streamlit caches ---
+.promptfoo/
+.streamlit/
+livekit_recordings/
+
+# --- Office lock files ---
+~$*
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- Logs / runtime ---
+*.log
+*.pid

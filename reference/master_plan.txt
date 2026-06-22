@@ -1,0 +1,427 @@
+MediCall AI
+MVP Master Plan
+AI Voice Agent for Elderly Medication Adherence (India)
+Based on research doc: "AI Medication Reminder for Elderly"
+
+Context
+Nearly 48% of Indian chronic-disease patients are non-adherent to medication. The primary caregiver (adult child, 28-45, in a different city) cannot physically verify daily intake. The product solves this with an outbound AI voice call to the elderly parent at scheduled times — no smartphone app required on the parent's side. The caregiver gets a web dashboard to set schedules and track adherence.
+
+MVP Goal: Validate the core loop — schedule → AI call → confirmation logged → caregiver notified — with 50 beta user dyads (caregiver + parent pairs) within 1 month of heavy build.
+
+
+Section 1 — Product Requirements Document (PRD)
+1.1 User Personas
+
+1.2 Feature Set — Three Phases
+Phase A: Core Loop (MVP — Month 1)
+These are the only things you ship to 50 users.
+
+A1 — Caregiver Onboarding & Auth
+Email + password signup with OTP email verification
+After login: create a "dependent profile" — parent's name, phone number, preferred language (Hindi / Tamil / Bengali / Telugu / Malayalam)
+DPDP consent flow: system sends an OTP SMS to the parent's phone; caregiver inputs it to bind the accounts (this is the legal proxy consent step)
+Session management via JWT (Supabase Auth handles this natively)
+A2 — Medication Schedule Setup
+Manual entry mode: drug name, dosage, frequency, time(s) of day, duration, relation to meals
+OCR mode: upload a photo of a prescription → Veryfi Medical OCR API extracts a JSON draft → caregiver reviews + edits in a side-by-side view (original image left, editable form right) → approves
+Drug validation layer: backend cross-checks extracted drug names against Indian medicine DB (Apollo Pharmacy dataset or 1mg API) and flags unrecognized terms with suggestions
+Weekly calendar view: shows each medication slot color-coded (scheduled / completed / missed / pending)
+
+A3 — AI Voice Call Engine
+Cron trigger: Upstash QStash fires a durable job at scheduled medication time → backend calls Vapi.ai outbound call API
+Vapi orchestration: STT via Sarvam Saaras (vernacular), LLM for intent, TTS via Sarvam Bulbul (vernacular)
+Telephony: Exotel SIP trunk (India-local routing, <50ms media latency, TRAI-compliant caller ID)
+Call script flow (see Section 1.3 for full dialogue tree)
+On call end: Vapi webhook fires to backend → backend logs outcome (confirmed / denied / missed / deferred) to Supabase
+A4 — Three-Strike Escalation
+If call is unanswered: retry after 15 min, then 30 min (3 total attempts)
+After 3 strikes: halt automated calls for that event, fire escalation alert to caregiver via WhatsApp (Twixor or Plivo WA Business API) AND in-app push notification
+Alert payload includes: drug name, scheduled time, reason for escalation
+If patient verbally reports a side effect (nausea, dizziness): AI agent empathetically acknowledges, does NOT suggest any action, immediately triggers high-priority escalation to caregiver
+A5 — Caregiver Dashboard
+Home: adherence streak calendar (green = confirmed, red = missed, grey = pending)
+Call log view: every call with timestamp, outcome, and text transcript
+Medication list: active medications with edit/pause/delete
+Notification settings: configure escalation channel preference (WhatsApp / email)
+
+A6 — Admin Dashboard (operator)
+Total users (caregiver-patient dyads)
+Daily/weekly calls made vs answered vs missed
+Task Completion Rate (TCR), Call Abandonment Rate, average call duration
+Transcript audit view: random sample of 5 calls/day for hallucination check
+API spend tracker per component (Vapi, Sarvam, Exotel, Veryfi)
+Escalation events log
+Phase B: Intelligence & Retention (Month 2-3)
+Ship after validating Phase A with real users.
+Sentiment analysis on call transcripts: detect patient distress patterns (unusually short responses, repeated refusals)
+Long-term adherence analytics: 7-day / 30-day adherence rate charts per patient
+Multi-caregiver support: allow one patient to have up to 3 caregivers (primary + backup contacts)
+Snooze/reschedule from dashboard: caregiver can reschedule a missed dose window
+WhatsApp push notification to caregiver post-successful call: "Dad took his BP tablet at 8:03 AM"
+Customizable AI persona tone: formal vs familial, configurable per patient
+Phase C: Scale & Optimization (Month 3+)
+Fine-tune open-source MLLM (Qwen-VL) on accumulated prescription dataset to replace Veryfi OCR API
+Multi-language expansion beyond Phase A languages
+Mobile app (React Native) for caregiver
+Referral/subscription billing layer
+
+
+1.3 Voice Call Dialogue Structure
+Happy Path (patient picks up, confirms):
+AI:  "Namaste [Parent name], main [AI name] bol raha hoon. Aapka [Drug name],
+      [dosage], lene ka samay ho gaya hai. Kya aapne abhi tak liya hai?"
+PATIENT: "Haan, le liya" (or code-mixed: "Yes, le liya")
+AI:  "Bahut achha! Main note kar leta hoon. Apna khayal rakhiyega."
+→ Call ends. Backend logs: CONFIRMED.
+
+Deferral Path:
+PATIENT: "10 minute mein lo, abhi khaana kha raha hoon"
+AI:  "Bilkul, main 15 minute baad call karta hoon."
+→ Call ends. Backend queues a new QStash job for T+15min.
+
+Side-Effect Path:
+PATIENT: "Woh dawai lene ke baad chakkar aata hai"
+AI:  "Mujhe bahut dukh hua yeh sun ke. Kripya abhi yeh dawai mat lijiye aur
+      apne doctor se zaroor baat karein. Main aapke bete/beti ko turant
+      inform kar deta hoon."
+→ Call ends. Backend triggers IMMEDIATE escalation. Logs: ESCALATED-SIDE-EFFECT.
+
+No-Answer Path:
+→ Call rings, no answer / voicemail detected
+→ Backend logs: ATTEMPT_1_FAILED
+→ QStash queues retry after 15 min
+→ After 3 failures: logs ESCALATED-NO-ANSWER, fires WhatsApp alert to caregiver
+
+Strict Guardrails (hardcoded in LLM system prompt):
+NEVER alter dosage, timing, or medication names
+NEVER diagnose symptoms
+NEVER recommend stopping or starting any medication
+ALWAYS suggest consulting a doctor for medical concerns
+NEVER recall information from prior calls (stateless per conversation)
+
+1.4 Evaluation Metrics (Production Targets)
+
+Admin monitoring routine (daily, 15 min):
+Read Vapi dashboard for latency P95
+Sample 5 random transcripts for hallucination check
+Review all escalation events from prior day
+Check API spend vs budget
+
+
+Section 2 — Technical Requirements Document (TRD)
+2.1 System Architecture
+[Caregiver Web Dashboard]  →  [Next.js on Vercel (free tier)]
+         ↕ REST API
+[Node.js Backend]  →  [Render Starter, $7/mo, always-on]
+         ↕
+[Supabase PostgreSQL + Auth + Storage]  →  [Pro tier, $25/mo]
+         ↕
+[Upstash QStash]  →  [Durable cron scheduler, fires call jobs]
+         ↕
+[Vapi.ai]  →  [Voice orchestration layer, $0.05/connected-min]
+         ↕              ↕
+[Sarvam Saaras STT]   [Sarvam Bulbul TTS]   ← Vernacular models
+         ↕
+[Exotel SIP Trunk]  →  [PSTN → Parent's mobile phone]
+         ↕
+[Veryfi Medical OCR]  →  [Prescription digitization]
+         ↕
+[Indian Medicine DB]  →  [Drug name validation, Apollo/1mg dataset]
+         ↕
+[WhatsApp Business API (Twixor/Plivo)]  →  [Caregiver escalation alerts]
+
+2.2 Technology Stack
+2.3 Database Schema (Core Tables)
+-- caregivers (Supabase Auth user maps here)
+users (id, email, name, created_at)
+ 
+-- patients (elderly parent profiles)
+patients (id, caregiver_id FK, name, phone_e164, language,
+          consent_verified_at, consent_otp_hash)
+ 
+-- prescriptions (uploaded images + metadata)
+prescriptions (id, patient_id FK, image_url, raw_ocr_json,
+               status [pending|approved|rejected], created_at)
+ 
+-- medications (individual drugs from a prescription)
+medications (id, prescription_id FK, patient_id FK, drug_name,
+             dosage_mg, frequency, meal_relation,
+             start_date, end_date, active)
+ 
+-- medication_schedules (individual time slots)
+medication_schedules (id, medication_id FK, scheduled_time TIME,
+                      days_of_week[], qstash_job_id)
+ 
+-- call_logs (every call attempt)
+call_logs (id, schedule_id FK, patient_id FK, initiated_at,
+           answered_at, ended_at,
+           outcome [confirmed|denied|deferred|no_answer|escalated],
+           transcript_text, vapi_call_id, attempt_number)
+ 
+-- escalations
+escalations (id, patient_id FK, schedule_id FK, reason,
+             triggered_at, caregiver_notified_via, resolved)
+
+Row Level Security: All queries scoped to caregiver_id = auth.uid() — one caregiver cannot see another's data.
+2.4 Critical Engineering Decisions
+Why Render Starter ($7/mo) not free tier:
+Free Render sleeps after 15 min inactivity. Vapi webhooks during a live call would hit a sleeping server → 30-60 second cold start → patient hears dead silence → call abandoned. Non-negotiable paid upgrade.
+Why Supabase Pro ($25/mo) not free tier:
+Medical data = Sensitive Personal Data (SPD) under DPDP Act. Free tier has no PITR backups. A DB corruption or accidental delete = regulatory violation + patient harm. Non-negotiable paid upgrade.
+Why Upstash QStash not basic cron:
+Basic cron is fire-and-forget. If Vapi API is momentarily down, the job silently fails — patient misses reminder with no retry. QStash has built-in exponential backoff: retries at 5s → 15s → 1min. Also provides observability dashboard.
+Why Exotel not Twilio:
+Twilio India routing adds 200-800ms network latency (transoceanic hops). Exotel uses local Indian infra → <50ms media latency. Also 30-40% cheaper per minute for Indian numbers.
+Why Sarvam not global models:
+GPT-4o Whisper fails on heavy regional accents and code-mixing (Hindi-English mixed sentences). Sarvam Saaras is purpose-built for this exact demographic.
+Why Veryfi not custom ML (for MVP):
+Open-source MLLMs (Qwen-VL) achieve ~82% accuracy on Indian handwritten Rx — insufficient for production healthcare. Veryfi achieves 99%+. The plan is to build a proprietary dataset during MVP, then fine-tune and replace Veryfi in Phase C.
+2.5 DPDP Act 2023/2025 Compliance Checklist
+[ ]  OTP-based proxy consent flow for parent during onboarding (with timestamp audit log)
+[ ]  Data Processing Agreements (DPAs) signed with Vapi, Sarvam, Veryfi, Exotel prohibiting training data use
+[ ]  Row Level Security on all Supabase tables
+[ ]  AES-256 encryption at rest (Supabase Pro provides this)
+[ ]  TLS 1.3 in transit everywhere
+[ ]  Auto-purge of raw audio recordings and prescription images after 30 days (Supabase lifecycle rule)
+[ ]  User-facing 'Right to Erasure' button → cascading deletion across all tables + storage
+[ ]  Breach notification workflow: internal alerting + 72-hour window to notify Data Protection Board
+[ ]  Privacy Policy in plain language Hindi + English
+[ ]  Data minimization: only store what's needed (no raw audio after transcript is generated)
+Section 3 — Investment Plan (3 Months, 50 Users, Bootstrapped)
+3.1 Assumptions
+50 caregiver-patient dyads
+Average 3 medications per patient, 1 reminder call per medication per day
+Average call duration: 2.5 minutes (including greetings + confirmation)
+15% calls require a retry attempt (deferred or no-answer first try)
+Calls per day: 50 patients x 3 meds x 1.15 retry factor = 172 calls/day
+Total call minutes per month: 172 x 2.5 x 30 = 12,900 minutes/month
+
+3.2 Monthly Infrastructure Cost
+
+3-Month Infrastructure Total: ~₹2,67,000 (~$3,200)
+Note: Vapi is the dominant cost. Negotiating a startup plan or securing early-stage credits can reduce this significantly. Sarvam also has startup grant programs worth exploring before launch.
+
+3.3 One-Time Setup Costs
+
+3.4 Total 3-Month Budget
+
+3.5 Cost-Reduction Levers
+Sarvam startup credits: Apply before launch — Sarvam has an early-access program
+Vapi startup program: They offer free credits to early-stage health-tech startups
+Reduce call duration: Better TTS pacing and shorter scripts can cut average call to 1.5 min, saving ~40% on Vapi + Exotel
+Call time-banding: Schedule calls between 7-9 AM and 7-9 PM (higher pickup rates) to reduce retry overhead
+Exotel negotiation: At 50 users, they will negotiate custom rates if you frame it as pilot → scale
+Section 4 — Team Structure, Skills & Work Division
+4.1 Team Composition
+3 people: 1 Product (you) + 2 Engineers
+
+
+4.2 Required Technical Skills
+Engineer 1 (Frontend + Database):
+Next.js 14 (App Router) — not just Pages Router, must know server components
+Tailwind CSS + component library (shadcn/ui recommended)
+Supabase (Auth, RLS policies, real-time subscriptions)
+TypeScript — non-negotiable for this codebase complexity
+Basic SQL (writing RLS policies, migration scripts)
+File upload handling (multipart forms, image preview)
+Vercel deployment + GitHub CI/CD
+
+Engineer 2 (Backend + Voice AI):
+Node.js + Express/Fastify — async webhook handling is critical
+REST API design + JWT middleware
+Vapi.ai SDK and webhook event handling (this is the hardest skill to find)
+Sarvam AI API integration
+Exotel SIP configuration (at least comfortable reading docs)
+Upstash QStash (job scheduling, retry logic)
+Prompt engineering — LLM system prompts with strict guardrails
+WhatsApp Business API (Twixor/Plivo)
+
+You (Product + Backend Support):
+DPDP Act requirements — you are the compliance owner
+Prompt engineering and AI guardrail design
+Vapi dashboard monitoring and latency tuning
+Analytics and admin dashboard design
+User research with beta users (calling them, watching sessions)
+Vendor negotiation (Sarvam, Exotel, Vapi)
+
+4.3 Work Division — MVP Month (4 Weeks)
+Week 1 — Foundation
+
+Week 2 — Core Features
+
+Week 3 — Call Engine + Escalation
+
+Week 4 — Polish + Beta Launch
+Section 5 — Pre-Build Research Checklist
+Before writing a single line of code, complete these:
+
+5.1 Vendor Validation (Week 0 — Before Month 1)
+[ ]  Vapi.ai: Create account, make a test outbound call to an Indian mobile number. Verify actual latency from India. Apply for startup credits.
+[ ]  Sarvam AI: Get API keys, test Saaras STT with a real Hindi voice recording. Test Bulbul TTS. Confirm custom provider webhook works in Vapi.
+[ ]  Exotel: Call their sales team. Get a test Exophone number. Understand TRAI DND compliance — do they scrub against DND registry automatically? Get pricing in writing.
+[ ]  Veryfi: Upload 5 sample Indian doctor prescriptions (handwritten). Evaluate JSON output accuracy. If <90% on your samples, evaluate Koncile as fallback.
+[ ]  Twixor/Plivo WA API: Confirm WhatsApp Business account creation timeline (Facebook verification takes 3-5 days — start this on Day 1).
+
+5.2 Legal Research
+[ ]  Confirm whether an elderly patient with full cognitive capacity needs a separate written consent form beyond the OTP flow under DPDP 2025 rules (consult a legal advisor — 1 hour, ~₹3,000)
+[ ]  Understand TRAI regulations around outbound automated calls — are there restrictions on AI-initiated calls to Indian mobiles? (Exotel should advise on this — it is a real risk)
+[ ]  Check if DPDP 'Significant Data Fiduciary' designation applies (likely not at MVP scale, but know the threshold)
+
+5.3 User Research (Before Building UI)
+[ ]  Do 5 discovery calls with caregivers: What does their current reminder workflow look like? WhatsApp? Manual calls? What times do their parents typically take medicines?
+[ ]  Do 2-3 calls with elderly parents (or family members who are 65+): How do they feel about receiving calls from an unknown/AI number? What language + tone works? What makes them hang up?
+[ ]  Validate: Is 3 medicines/day a realistic average? (This drives your cost model significantly)
+
+5.4 Technical Spikes (Before Committing to Architecture)
+[ ]  Latency stack test: Set up Vapi + Sarvam + Exotel in isolation, make one real call, measure actual P95 latency end-to-end. If >1000ms, investigate bottleneck before building.
+[ ]  Indian handwriting OCR test: Get 10 real doctor prescriptions (blurred for privacy), run through Veryfi. Pass rate must be >90% before committing to Veryfi.
+[ ]  Hindi code-mixing NLU test: Test Sarvam STT on sentences like 'Haan, le liya' and 'Abhi busy hoon, 10 minutes mein call karo.' Verify it transcribes accurately.
+
+
+Section 6 — Admin Dashboard Metrics (Operator View)
+6.1 Business Health Metrics
+Monthly Active Dyads (caregiver-patient pairs)
+New registrations per week
+Churn: dyads with no calls in last 7 days
+Prescription uploads per week
+OCR approval rate (% of OCR outputs approved without edits)
+
+6.2 Call Quality Metrics
+Total calls per day (initiated vs answered vs confirmed vs escalated)
+TCR (Task Completion Rate) — rolling 7-day average
+Average call duration
+Turn latency P95 — pulled from Vapi analytics
+Call abandonment rate
+Retry rate (% of calls that needed a second attempt)
+
+6.3 Safety / Compliance Metrics
+Escalations triggered per day (with reasons)
+Hallucination review queue: 5 random transcripts/day flagged for manual review
+Side-effect escalations (highest priority — any patient who reported adverse effects)
+API error rates per vendor (Vapi, Sarvam, Exotel, Veryfi)
+
+6.4 Financial Metrics
+Cost per call (Vapi + Sarvam + Exotel)
+Cost per dyad per month
+API spend vs budget by vendor
+Projected burn at current growth rate
+
+
+Verification / Testing Plan
+Before launching to real users:
+
+End-to-end call test: Caregiver signs up → uploads prescription → OCR extracts → approves → system fires call at scheduled time → call connects → confirm intake → dashboard logs 'confirmed'
+Latency test: Measure P95 turn latency using Vapi dashboard on 20 test calls. Must be <800ms.
+Escalation test: Simulate no-answer 3 times on a test number. Verify WhatsApp message fires.
+Guardrail test: Manually tell the AI 'mujhe bahut dard ho raha hai' — verify it does NOT give medical advice and instead escalates
+Hallucination test: Review 20 transcripts, verify no invented drug names, dosages, or medical claims
+RLS test: Create two test caregiver accounts, verify neither can read the other's data via API
+DPDP test: Use Right to Erasure button, verify all user data deleted across tables and storage
+Concurrent load: Simulate 10 simultaneous calls, verify no timeouts or webhook failures
+
+===TABLES===
+--TABLE 0--
+Persona | Who | Interface | Pain Point
+--TABLE 1--
+Caregiver | Adult child, 28-45, metro, high tech literacy | Web dashboard | Anxiety + inability to verify daily intake
+Patient | Elderly parent, 60+, low-mid tech literacy, native language speaker | Phone call only — zero app interface | Polypharmacy confusion, missed doses
+Admin | You (operator) | Admin dashboard | Monitor system health, call quality, user growth
+--TABLE 2--
+Metric | Target | How to Measure
+Task Completion Rate (TCR) | > 85% | Confirmed + Denied / Total calls initiated
+Word Error Rate (WER) | < 5% | Manual audit of 5 transcripts/day vs actual audio
+Turn Latency P95 | < 800ms | Vapi analytics dashboard
+Hallucination Rate | < 0.1% | Manual transcript review — zero tolerance for medical fabrication
+Call Abandonment Rate | < 10% | Calls ended before intent captured / total answered calls
+Compliance Score | > 99% | Guardrail audit: did agent ever give medical advice?
+Escalation False-Positive Rate | < 5% | Escalations reviewed manually — was the escalation warranted?
+--TABLE 3--
+Layer | Technology | Justification
+Frontend | Next.js 14 (App Router) + Tailwind CSS | React ecosystem, Vercel-native, fast SSR
+Auth | Supabase Auth (JWT) | Built-in RLS, OTP flows, no extra infra
+Backend | Node.js + Express (or Fastify) | Fast webhook handling, async Vapi events
+Database | Supabase PostgreSQL | RLS for tenant isolation, PITR backups
+File Storage | Supabase Storage | Prescription image storage (auto-purge at 30d)
+Cron/Scheduling | Upstash QStash | Durable execution, exponential backoff on failure
+Voice Orchestration | Vapi.ai | Manages VAD, barge-in, STT/TTS routing
+STT | Sarvam AI — Saaras model | Best-in-class Indian vernacular recognition
+TTS | Sarvam AI — Bulbul model | Natural Hindi/Tamil/Bengali voices
+Telephony | Exotel (SIP trunk) | India-local routing <50ms, TRAI-compliant
+OCR | Veryfi Medical Prescription API | 99%+ accuracy on handwritten Rx
+Drug Validation | Apollo Pharmacy Kaggle + 1mg API | Cross-check extracted drug names
+Escalation | Twixor / Plivo WhatsApp Business API | Reliable WA message delivery
+Frontend Hosting | Vercel (free) | Global edge, CI/CD from GitHub
+Backend Hosting | Render Starter ($7/mo) | Always-on, no cold-start problem
+Monitoring | Vapi analytics + custom Supabase views | Admin dashboard feeds
+--TABLE 4--
+Service | Unit Price | Volume | Monthly (INR) | Monthly (USD)
+Vapi.ai orchestration | $0.05/min | 12,900 min | ₹54,000 | $645
+Sarvam Saaras STT | ₹30/hr | 215 hrs | ₹6,450 | $77
+Sarvam Bulbul TTS | ₹20/10k chars | ~6M chars | ₹12,000 | $143
+Exotel outbound calls | ₹0.90/min | 12,900 min | ₹11,610 | $139
+Veryfi OCR | ~$0.08/doc | ~100 Rx/mo | ₹670 | $8
+Supabase Pro | $25/mo | — | ₹2,100 | $25
+Render Starter | $7/mo | — | ₹587 | $7
+Upstash QStash | $10/mo (payg) | — | ₹837 | $10
+WhatsApp Business API | ~$0.015/msg | ~500 msgs/mo | ₹630 | $8
+Exotel SMS (OTP) | ₹0.18/SMS | ~200 SMS/mo | ₹36 | <$1
+Vercel | Free | — | ₹0 | $0
+Total / month |  |  | ~₹88,920 | ~$1,062
+--TABLE 5--
+Item | Estimated Cost
+Domain (.com + 1yr) | ₹1,000
+SSL certificate | Free (Let's Encrypt)
+Exotel Exophone number provisioning | ₹2,000 setup
+Veryfi API account setup | Free
+Legal: Privacy Policy + ToS draft | ₹5,000 (freelance)
+DPDP DPA legal review (4 vendors) | ₹15,000 (optional, DIY-able at MVP)
+One-time Total | ~₹23,000
+--TABLE 6--
+Category | Amount
+Infrastructure (3 months) | ₹2,67,000
+One-time setup | ₹23,000
+Buffer (15% for overages) | ₹43,500
+Total | ~₹3,33,500 (~$4,000)
+--TABLE 7--
+Role | Person | Background Needed
+Product + Backend Lead | You | Technical enough to own API integrations, prompt engineering, DPDP compliance
+Full-Stack Engineer 1 (Frontend + DB) | Hire/Partner | React/Next.js, Supabase, dashboard UX
+Full-Stack Engineer 2 (Backend + Voice) | Hire/Partner | Node.js, APIs, Vapi integration, webhooks
+--TABLE 8--
+Task | Owner
+Supabase project setup: schema, RLS, Auth | Eng 1
+Render + Vercel deployment pipeline + GitHub repo setup | Eng 2
+Caregiver signup + JWT auth flow (frontend + backend) | Eng 1
+OTP consent flow for parent (SMS via Exotel/Twixor) | Eng 2
+Upstash QStash integration + test job | Eng 2
+Vapi account setup + first test outbound call | Eng 2
+DPDP compliance doc + vendor DPA drafts | You
+--TABLE 9--
+Task | Owner
+Medication schedule CRUD (frontend form + backend API) | Eng 1
+Veryfi OCR integration + JSON parser | Eng 2
+Drug name validation against medicine DB | Eng 2
+OCR review UI (side-by-side image + editable form) | Eng 1
+Vapi → Sarvam STT/TTS custom provider webhook setup | Eng 2
+Exotel SIP trunk configuration with Vapi | Eng 2
+Prompt engineering: call scripts + guardrails | You
+--TABLE 10--
+Task | Owner
+Adherence calendar UI on dashboard | Eng 1
+Call log view + transcript display | Eng 1
+Vapi webhook → call_logs Supabase write | Eng 2
+Three-strike escalation logic | Eng 2
+WhatsApp Business API escalation messages | Eng 2
+Deferral re-scheduling (QStash re-queue) | Eng 2
+Admin dashboard (basic metrics view) | Eng 1
+End-to-end test: full call cycle on a real Indian number | You + Eng 2
+--TABLE 11--
+Task | Owner
+Bug fixes from week 3 E2E testing | All
+Latency audit: verify P95 <800ms | Eng 2
+Manual transcript review for hallucination check | You
+Onboard first 5 real users (family/friends as beta) | You
+Admin dashboard live data | Eng 1
+Privacy policy + consent UI copy (Hindi + English) | You
+Load test: simulate 50 concurrent calls | Eng 2
+Caregiver notification preferences (email + WA toggle) | Eng 1

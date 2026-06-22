@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediCall — Chat with Agent (no real phone call)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.5.7/dist/livekit-client.umd.min.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col">
+  <header class="bg-white border-b border-slate-200 px-6 py-4 shadow-sm">
+    <h1 class="text-xl font-semibold text-slate-900">MediCall — Chat with Agent (no real phone call)</h1>
+    <p class="text-sm text-slate-500 mt-1">Browser-based test client for the LiveKit voice agent.</p>
+  </header>
+
+  <main class="flex-1 max-w-3xl w-full mx-auto px-6 py-6 flex flex-col gap-4">
+    <div class="flex gap-3 items-center">
+      <button id="connectBtn" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-medium transition">
+        Connect
+      </button>
+      <button id="disconnectBtn" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-md font-medium transition disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+        Disconnect
+      </button>
+      <button id="muteBtn" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-md font-medium transition disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+        Mute Mic
+      </button>
+      <span id="status" class="ml-auto text-sm text-slate-500">Idle</span>
+    </div>
+
+    <div class="flex-1 bg-white border border-slate-200 rounded-lg shadow-sm flex flex-col min-h-[400px]">
+      <div class="px-4 py-2 border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500 font-medium">
+        Live Transcript
+      </div>
+      <div id="transcript" class="flex-1 overflow-y-auto px-4 py-3 space-y-2 text-sm">
+        <p class="text-slate-400 italic">Click Connect to start. Speak naturally — the agent will respond.</p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="bg-amber-50 border-t border-amber-200 px-6 py-3 text-sm text-amber-800">
+    <strong>Note:</strong> Make sure <code class="bg-amber-100 px-1 rounded">agent.py</code> is running with: <code class="bg-amber-100 px-1 rounded">python agent.py dev</code>
+  </footer>
+
+  <script src="/client.js"></script>
+</body>
+</html>

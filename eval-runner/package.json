@@ -1,0 +1,28 @@
+{
+  "name": "eval-runner",
+  "version": "1.0.0",
+  "description": "MediCall AI Promptfoo eval runner — listens on Postgres NOTIFY, runs goldenset, writes results back",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "fastify": "^4.28.0",
+    "js-yaml": "^4.1.0",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.14.0",
+    "@types/pg": "^8.11.10",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  }
+}

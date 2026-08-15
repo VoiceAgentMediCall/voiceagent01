@@ -14,7 +14,10 @@ Fastify worker that listens on the `eval_runs_queue` Postgres channel and runs t
 
 ```bash
 cp .env.example .env
-# Fill in values from voiceagent/supabase_credentials.txt
+# Fill in eval-runner-specific values here, plus the shared Supabase/Groq
+# credentials in the repo-root .env (copy from repo-root .env.example) —
+# see CLAUDE.md § Environment variables for the full split.
+set -a && source ../.env && source .env && set +a   # this service doesn't self-load dotenv
 npm i
 npm run dev
 ```
@@ -31,7 +34,7 @@ Either:
 
 ## Deploy
 
-Railway picks up the Dockerfile. Set env vars from `.env.example`. **Use the direct Postgres URL (port 5432), not the pooler (6543)** — `LISTEN` requires a persistent session and the transaction-mode pooler will not keep it alive.
+Railway picks up the Dockerfile. Set env vars from `.env.example` (this file) and the repo-root `.env.example`. **Use the Session Pooler connection string** (`aws-0-<region>.pooler.supabase.com:5432`), not the Transaction pooler (port 6543) — transaction-mode pooling rotates the backend connection per transaction and breaks `LISTEN`, which needs one persistent session. Also avoid the "Direct connection" string (`db.<ref>.supabase.co`) if possible — it's IPv6-only on many networks and may not resolve at all; Session Pooler gives the same persistent-session guarantee over IPv4.
 
 ## Normalized result shape
 

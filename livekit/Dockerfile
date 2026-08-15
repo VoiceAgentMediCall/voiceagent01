@@ -1,3 +1,12 @@
+# Build context: REPO ROOT, not livekit/ — this service reads
+# ../prompt-config/prompts.yaml relative to agent.py at runtime (see
+# PROMPTS_YAML_PATH in agent.py), so the image mirrors the repo's layout
+# (/app/livekit/ + /app/prompt-config/) instead of flattening everything
+# into one directory, which would silently break that lookup.
+#
+# Build from repo root:
+#   docker build -f livekit/Dockerfile -t medicall-agent .
+
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -14,10 +23,11 @@ RUN apt-get update \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt ./
-RUN pip install --upgrade pip && pip install -r requirements.txt
+COPY livekit/requirements.txt ./livekit/requirements.txt
+RUN pip install --upgrade pip && pip install -r livekit/requirements.txt
 
-COPY agent.py ./
-COPY voicemail_detector.py ./voicemail_detector.py
+COPY livekit/agent.py livekit/voicemail_detector.py ./livekit/
+COPY prompt-config ./prompt-config
 
+WORKDIR /app/livekit
 ENTRYPOINT ["python", "agent.py", "start"]

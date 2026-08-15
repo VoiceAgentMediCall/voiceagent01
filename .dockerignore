@@ -1,0 +1,32 @@
+# Governs the build context for services built from repo root
+# (eval-runner/Dockerfile, livekit/Dockerfile). dashboard/ has its own
+# .dockerignore since it builds from ./dashboard as context instead.
+
+# Dependencies / build artifacts (rebuilt fresh inside each image)
+**/node_modules
+**/.next
+**/dist
+**/__pycache__
+**/.pytest_cache
+**/.venv
+**/venv
+
+# Secrets — never send these into a build context
+.env
+.env.*
+!*.env.example
+
+# VCS / IDE / OS
+.git
+.vscode
+.idea
+.DS_Store
+
+# Large, irrelevant to any service's runtime
+docs/
+reference/
+knowledge-base/
+
+# Misc
+*.log
+*.pid

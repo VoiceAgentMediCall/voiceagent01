@@ -5,7 +5,7 @@ raw speech/non-speech segmentation upstream; this module consumes those
 segment boundaries to decide whether the far-end is a live human or a
 voicemail/IVR system based on response timing and monologue length.
 
-Design rationale: see voiceagent/docs/research/silero-vad-voicemail.md
+Design rationale: see voiceagent/reference/research/silero-vad-voicemail.md
 
 Heuristics:
     1. After the agent finishes its greeting, a live human typically responds

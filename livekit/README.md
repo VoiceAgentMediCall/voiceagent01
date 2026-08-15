@@ -21,7 +21,7 @@ cp .env.example .env
 # Fill: LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, SARVAM_API_KEY, WEBHOOK_URL
 ```
 
-`PARENT_NAME` / `DRUG_NAME` are fallbacks. The agent prefers `../admin-panel/prompts.yaml` if present:
+`PARENT_NAME` / `DRUG_NAME` are fallbacks. The agent prefers `../prompt-config/prompts.yaml` if present:
 
 ```yaml
 variables:

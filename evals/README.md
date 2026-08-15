@@ -6,7 +6,7 @@ safety guardrail breaks, and outcome-classification regressions before they ship
 ## Canonical file
 
 **`goldenset.yaml`** — single source of truth. Contains providers, inlined system
-prompt (kept in sync with `admin-panel/prompts.yaml`), and all 4 scenarios.
+prompt (kept in sync with `prompt-config/prompts.yaml`), and all 4 scenarios.
 
 Pattern mirrors HelloCounsel Receptionist's `promptfooconfig.yaml` +
 `golden_set_v1_4.yaml`, but consolidated into one file.
@@ -17,18 +17,16 @@ Pattern mirrors HelloCounsel Receptionist's `promptfooconfig.yaml` +
 npm install -g promptfoo
 ```
 
-Requires `OPENAI_API_KEY` in env (used by both the provider under test and the
-`llm-rubric` grader).
-
-```bash
-export OPENAI_API_KEY=sk-...
-```
+Requires `GROQ_API_KEY` in env (used by both the provider under test and the
+`llm-rubric` grader). This service has no `.env` of its own — the key lives in
+the repo-root `.env` (see `CLAUDE.md` § Environment variables), so every local
+invocation needs `--env-path ../.env` to find it.
 
 ## Run
 
 ```bash
 cd evals
-npx promptfoo eval --config goldenset.yaml
+npx promptfoo eval --config goldenset.yaml --env-path ../.env
 ```
 
 Outputs pass/fail per scenario, latency, and token usage. Failures show the diff
@@ -37,7 +35,7 @@ between expected and actual.
 Filter to a single scenario while iterating:
 
 ```bash
-npx promptfoo eval --config goldenset.yaml --filter-tests 0   # first scenario only
+npx promptfoo eval --config goldenset.yaml --env-path ../.env --filter-tests 0   # first scenario only
 ```
 
 ## View results in browser
@@ -80,7 +78,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
-      - env: { OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }} }
+      - env: { GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }} }
         run: cd evals && npx promptfoo eval --config goldenset.yaml --output results.json
       - uses: actions/upload-artifact@v4
         with: { name: eval-results, path: evals/results.json }
@@ -109,7 +107,7 @@ Append a block under `tests:` in `goldenset.yaml`:
           return <bool>;
 ```
 
-Run `npx promptfoo eval --config goldenset.yaml` locally. If the new test passes
+Run `npx promptfoo eval --config goldenset.yaml --env-path ../.env` locally. If the new test passes
 against the current prompt, commit. If it fails, decide whether the prompt or the
 test is wrong before merging.
 
@@ -121,6 +119,6 @@ intent matters (safety, tone, outcome classification).
 ## Keeping the prompt in sync
 
 The system prompt in `goldenset.yaml` is **inlined** (not loaded from
-`admin-panel/prompts.yaml`) because the live file uses Python `{var}` substitution
+`prompt-config/prompts.yaml`) because the live file uses Python `{var}` substitution
 while Promptfoo uses Mustache `{{var}}`. When the live prompt changes, manually
 update the inlined copy in `goldenset.yaml` and re-run the eval.

@@ -25,7 +25,7 @@
 # PROVIDER-COUPLED ASSERTIONS — read before changing the provider
 # ============================================================
 # The system_prompt is INLINED below (kept byte-equivalent to
-# admin-panel/prompts.yaml as of 2026-06-22). When the live prompt changes,
+# prompt-config/prompts.yaml as of 2026-06-22). When the live prompt changes,
 # this file must be re-synced. Mustache `{{var}}` is used here for Promptfoo
 # templating; the live runtime uses Python `{var}` substitution against the
 # same variables dict — keep the variable NAMES (parent_name, drug_name) in sync.
@@ -96,6 +96,16 @@ defaultTest:
   vars:
     parent_name: "शुभ"
     drug_name: "Crocin"
+  # Explicit grading provider for llm-rubric assertions below. Without this,
+  # promptfoo falls back to its built-in default grader (Google AI Studio /
+  # Gemini), which in the currently-resolved promptfoo release is wired to an
+  # abstract stub whose callApi() unconditionally throws "Not implemented" —
+  # every scenario errors out regardless of any API key. Pinning the grader
+  # to the same Groq model already used as the provider under test restores
+  # the single-vendor (Groq-only, no OpenAI/Google key) setup this file
+  # documents at the top.
+  options:
+    provider: groq:llama-3.3-70b-versatile
 
 # ============================================================
 # TESTS — 4 scenarios. Each combines regex + llm-rubric + javascript.

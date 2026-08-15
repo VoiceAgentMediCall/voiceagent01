@@ -4,7 +4,7 @@ Ports the Vapi assistant (scaffolds/vapi_assistant.json) to LiveKit Agents 1.x.
 - STT: Sarvam Saaras v3
 - TTS: Sarvam Bulbul v2 (anushka voice, hi-IN)
 - LLM: Sarvam-M via openai.LLM fallback (plugin enum lags Sarvam releases —
-  see docs/research/livekit-plugins-sarvam.md §7a)
+  see reference/research/livekit-plugins-sarvam.md §7a)
 - VAD: Silero
 - End-of-call webhook with outcome heuristics + voicemail detection.
 """
@@ -53,13 +53,19 @@ from voicemail_detector import VoicemailDetector
 # Bootstrap
 # ---------------------------------------------------------------------------
 
-load_dotenv()
+AGENT_DIR = Path(__file__).resolve().parent
+
+# Shared credentials (Supabase/LiveKit/Groq) live in the repo-root .env;
+# livekit-specific ones (SIP_TRUNK_ID, SARVAM_API_KEY, ...) live in livekit/.env.
+# Neither call overrides already-set env vars by default, and the two files
+# don't share any keys, so load order only matters for readability here.
+load_dotenv(AGENT_DIR / ".." / ".env")
+load_dotenv(AGENT_DIR / ".env")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s :: %(message)s")
 logger = logging.getLogger("medicall.livekit")
 
-AGENT_DIR = Path(__file__).resolve().parent
-PROMPTS_YAML_PATH = (AGENT_DIR / ".." / "admin-panel" / "prompts.yaml").resolve()
+PROMPTS_YAML_PATH = (AGENT_DIR / ".." / "prompt-config" / "prompts.yaml").resolve()
 
 VOICEMAIL_GREETING_GRACE_SECONDS = 10.0  # B5: shrunk from 30s now that VoicemailDetector is wired (Bug #5 hangs up explicitly on success)
 SILENCE_TIMEOUT_SECONDS = 8.0
@@ -133,7 +139,7 @@ class CallVariables:
     first_message_template: str = _DEFAULT_FIRST_MESSAGE
     # B6: prompt_version surfaced on the end-of-call webhook so the dashboard
     # can correlate outcomes with the prompt revision that produced them.
-    # Sourced from `version:` (top-level) in admin-panel/prompts.yaml.
+    # Sourced from `version:` (top-level) in prompt-config/prompts.yaml.
     # None when the YAML lacks the key — Admin tab (B12) owns adding it.
     prompt_version: Optional[int] = None
 

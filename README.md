@@ -1,8 +1,8 @@
 # MediCall AI — Voice Agent Project
 
-Hindi-language outbound voice agent that calls elderly Indian parents to confirm medication adherence. Stack: **LiveKit Agents + Sarvam (STT/TTS/LLM) + Twilio SIP + Google Sheet logging.**
+Hindi-language outbound voice agent that calls elderly Indian parents to confirm medication adherence. Stack: **LiveKit Agents + Sarvam (STT/TTS/LLM) + Twilio SIP + Supabase (Postgres/Auth) + Next.js dashboard.**
 
-> If you're new here, start with **[`docs/MediCall-Master-Documentation.docx`](docs/MediCall-Master-Documentation.docx)** — single-file onboarding for the whole product.
+> **Start with [`CLAUDE.md`](CLAUDE.md)** — that's the maintained onboarding doc (architecture, commands, env vars, constraints). This README is a quick orientation map; `CLAUDE.md` is what's kept accurate day to day.
 
 ---
 
@@ -11,75 +11,85 @@ Hindi-language outbound voice agent that calls elderly Indian parents to confirm
 | Folder | What's in it |
 |---|---|
 | **`livekit/`** | The Python LiveKit Agent (`agent.py`) — the brain. STT/LLM/TTS wiring, voicemail detection, webhook POST. Run with `python agent.py dev`. Place outbound test calls with `python dial.py`. |
-| **`dashboard/`** | Next.js dashboard (live at https://voiceagent01-production.up.railway.app/). Replaces the legacy Streamlit admin panel, FastAPI browser test, and Apps Script webhook. Tabs: `/admin` (Prompt Editor — edits `admin-panel/prompts.yaml`), `/test` (Browser Test), plus the production webhook at `/api/webhook/livekit`. |
-| **`admin-panel/`** | Holds `prompts.yaml` only — the runtime prompt file that `agent.py` reads. Edit it via the dashboard `/admin` tab. (Streamlit UI deprecated 2026-06-22.) |
-| **`evals/`** | Promptfoo regression scenarios (3 YAML cases: confirm / deny / symptom). Run with `promptfoo eval`. |
-| **`eval-runner/`** | Eval runner harness for the goldenset. |
-| **`supabase/`** | Supabase schema — source of truth for call schedule and call logs (replaces the legacy CSV templates). |
-| **`docs/`** | Active planning + operator docs. See section below for what each is. |
-| **`docs/archive/`** | Vapi-era plans kept for audit trail (pre-migration). |
-| **`docs/research/`** | 5 deep-dive research docs (LiveKit Cloud, Sarvam plugin, Twilio SIP, DX stack, Silero VAD). |
-| **`reference/`** | Source material: master plan, raw survey responses, validation framework, the original survey xlsx. |
-| **`reference/originals/`** | Original Word brainstorms (kept for historical formatting / notes). |
-| **`hellocounsel prompts and stuff/`** | Voice-agent reference material from HelloCounsel work (not MediCall, but useful prompt-engineering reference). |
+| **`dashboard/`** | Next.js operator dashboard. Tabs: Home, Admin (prompt editor), Browser Test, Evals, Calls, Schedule, Costs, Settings, Master Control. Note: Costs and Settings currently render static placeholder content, not live data. |
+| **`prompt-config/`** | Holds `prompts.yaml` only — the runtime prompt file `agent.py` reads. Edit it via the dashboard's Admin tab. (The old Streamlit admin panel this folder was named after has been fully removed, not just deprecated — hence the rename from `admin-panel/`.) |
+| **`evals/`** | Promptfoo goldenset (`goldenset.yaml`, 4 scenarios: confirm / deny / symptom / clarify). Run with `promptfoo eval --config goldenset.yaml --env-path ../.env` (has no `.env` of its own — see `.env` below). |
+| **`eval-runner/`** | Fastify service that listens on Postgres `eval_runs_queue` (via `LISTEN`/`NOTIFY`) and runs the goldenset when the dashboard triggers an eval. |
+| **`supabase/migrations/`** | Schema source of truth — `users`, `prompts`, `parents`, `call_logs`, `eval_runs`, `allowed_emails`, `audit_log`. Apply in order via Supabase SQL Editor; verify what's actually applied before assuming a project is set up (see `CLAUDE.md`). |
+| **`docs/`** | Dated planning + operator docs, newest first is usually most relevant. See `docs/archive/` for anything superseded. |
+| **`docs/archive/`** | Superseded plans and historical session records, kept for audit trail — not current guidance. |
+| **`reference/`** | Background material: master plan, survey responses, validation framework, research memos (`reference/research/`), original Word brainstorms (`reference/originals/`), and HelloCounsel prompt-engineering reference (`reference/hellocounsel/`). |
+| **`docker-compose.yml`** | Runs all three services (dashboard, eval-runner, livekit-agent) together. See "How to run end-to-end" below. |
+| **`.env`** (repo root) | Shared Supabase/LiveKit/Groq credentials, copy from `.env.example`. Anything used by only one service lives in that service's own `.env` instead — see `CLAUDE.md` § Environment variables for the full split. |
 
 ---
 
 ## How to run end-to-end
 
+### Option A — Docker (recommended, all three services at once)
+
+```bash
+# Fill in .env (repo root, shared credentials) and each service's own .env first
+# (see CLAUDE.md § Environment variables).
+export $(grep -E '^NEXT_PUBLIC' dashboard/.env.local | xargs)
+docker compose up --build
+```
+
+Dashboard → http://localhost:3000, eval-runner health check → http://localhost:3001/health. See `CLAUDE.md` § Docker for why `eval-runner`/`livekit` build from the repo root (not their own subdirectory) and why all three images pin Node 22.
+
+### Option B — run each service manually
+
 | Step | Command | Where |
 |---|---|---|
-| 1. Install agent deps (once) | `pip install -r requirements.txt` | `livekit/` |
+| 1. Install agent deps (once) | `pip install -r requirements.txt` (use a venv — recent macOS Python is externally-managed) | `livekit/` |
 | 2. Install dashboard deps (once) | `npm install` | `dashboard/` |
-| 3. Boot the agent (leave running) | `python agent.py dev` | `livekit/` |
-| 4. Boot the dashboard (leave running) | `npm run dev` → http://localhost:3000 (use `/admin` for prompt editor, `/test` for browser test) | `dashboard/` |
-| 5. Place a real phone call | `python dial.py [+91XXXXXXXXXX]` | `livekit/` |
-| 6. Run regression evals | `promptfoo eval` | `evals/` |
+| 3. Install eval-runner deps (once) | `npm install && npm run build` | `eval-runner/` |
+| 4. Copy each `.env.example` → the real file and fill in credentials | `.env` (repo root, shared) + `livekit/`, `dashboard/`, `eval-runner/` — see `CLAUDE.md` § Environment variables | repo root + `livekit/`, `dashboard/`, `eval-runner/` |
+| 5. Boot the agent (leave running) | `python agent.py dev` | `livekit/` |
+| 6. Boot the dashboard (leave running) | `npm run dev` → http://localhost:3000 (loads `../.env` + `.env.local` via `dotenv-cli`) | `dashboard/` |
+| 7. Boot the eval-runner (leave running) | `set -a && source ../.env && source .env && set +a && node dist/index.js` | `eval-runner/` |
+| 8. Place a real phone call | `python dial.py +91XXXXXXXXXX` | `livekit/` |
+| 9. Run regression evals | `npx promptfoo eval --config goldenset.yaml --env-path ../.env` | `evals/` |
 
-> The production dashboard is deployed at https://voiceagent01-production.up.railway.app/ — LiveKit posts call results to `/api/webhook/livekit` there (replacing the legacy Apps Script webhook).
+Note on ports: the dashboard's Next.js dev server and `eval-runner`'s Fastify server both default to `3000` — `eval-runner/.env.example` sets `PORT=3001` specifically to avoid that collision when running both locally.
 
 ---
 
-## Active docs (read in this order)
+## Docs worth knowing about
 
 | Doc | Purpose |
 |---|---|
-| `docs/MediCall-Master-Documentation.docx` | One-stop onboarding doc. Read first. |
-| `docs/2026-06-15-medicall-prd-trd.md` | Product Requirements + Technical Requirements (v3, LiveKit-primary). |
-| `docs/2026-06-15-medicall-pilot-mvp-design.md` | Locked pilot spec (5 parents, 25 calls, Days 5-9). |
-| `docs/2026-06-15-livekit-migration-plan.md` | Why we moved Vapi → LiveKit + the migration architecture. |
-| `docs/livekit-provisioning-and-twilio-sip.md` | Step-by-step LiveKit Cloud signup + Twilio SIP trunk wiring. |
-| `docs/2026-06-15-phase5-golive-checklist.md` | Single-page operator checklist for taking the migration live. |
-| `docs/2026-06-15-phase6-open-decisions.md` | The 4 locked architectural decisions and their reasoning. |
-| `docs/2026-06-16-livekit-day1-runbook.md` | Day-1 operator runbook for the LiveKit stack. |
-| `docs/SESSION_HANDOFF_v2.md` | Latest session handoff (state of the world). |
-| `docs/research/*.md` | 5 reference docs for the architectural choices. |
+| `CLAUDE.md` | The maintained architecture/commands/constraints reference. Read this first. |
+| `PRD-TRD.md` | Product + Technical Requirements, v3 — locked, current source of truth for Phase 0 scope. |
+| `docs/2026-07-13-db-schema-dataflow-analysis.md` | As-built DB schema, data flow diagrams, and gap analysis vs. the PRD. |
+| `docs/2026-07-13-target-schema-and-dataflow.md` | Proposed target schema for near-term feature gaps (caregiver notifications, call dispatch queue, retry chain, consent tracking). |
+| `docs/livekit-provisioning-and-twilio-sip.md` | Step-by-step LiveKit Cloud + Twilio SIP trunk provisioning. |
+| `docs/2026-06-22-master-control-spec.md` | Design spec for the invite/role/audit-log access system. |
+| `docs/archive/` | Superseded PRD versions, session handoffs, and pre-migration Vapi-era plans — historical record, not current guidance. |
 
 ---
 
 ## Team access (Master Control)
 
-Dashboard access uses a strict allowlist + 3-tier role model (admin / editor / viewer) plus a separate `is_master` flag for irrevocable founder access.
+Dashboard access uses a strict allowlist + 4-tier role model (admin / editor / viewer / pending) plus a separate `is_master` flag for irrevocable founder access.
 
 ### Adding a teammate
 
-1. Sign in to https://voiceagent01-production.up.railway.app/ as an admin
-2. Open the **Master Control** tab (sidebar, top — admins only see it)
-3. Scroll to **Invite a teammate** → enter email + pick a role:
+1. Sign in to the dashboard as an admin
+2. Open the **Master Control** page (admins only)
+3. **Invite a teammate** → enter email + pick a role:
    - **admin** — everything + Master Control + can invite/remove teammates
    - **editor** — edit prompts, manage parents, run evals, place test calls
    - **viewer** — read-only across the dashboard
-4. They sign in via Google OAuth → land in the dashboard with the assigned role
-5. Every invite + role change is recorded in the **Audit log** card at the bottom
+4. They sign up via email/password (or Google OAuth, if enabled) → land in the dashboard with the assigned role once the `handle_new_user` trigger matches their email against the allowlist
+5. Every invite + role change is recorded in the **Audit log**
 
 ### Promoting someone to master admin
 
-Master status is **SQL-Editor-only by design** — there's no UI to grant it. The bar is intentionally high: a compromised/rogue admin can't accidentally make someone untouchable.
+Master status is **SQL-Editor-only by design** — there's no UI to grant it.
 
-Two-step process:
-
-1. **First invite them as admin via Master Control** (steps above) — they sign in once.
-2. **Then in Supabase SQL Editor** (https://supabase.com/dashboard/project/alzdxsjkvkqmvhrmbkrc/sql/new) run:
+1. First invite them as admin via Master Control — they sign in once.
+2. In your Supabase project's SQL Editor, run:
    ```sql
    update public.users
      set is_master = true
@@ -90,68 +100,33 @@ Two-step process:
      where email = 'theperson@example.com';
    -- expected: role=admin, is_master=true
    ```
-3. Refresh `/master` in the dashboard → their row shows a **MASTER** badge next to their role.
+3. Refresh Master Control in the dashboard → their row shows a **MASTER** badge.
+
+To remove master status, run the same update with `is_master = false`.
 
 ### What master status guarantees
 
-- **Cannot be demoted** via the UI (the role Select is disabled with a tooltip)
-- **Cannot be removed** via the UI (the Remove button is disabled)
-- **DB-enforced**: a CHECK constraint (`users_master_implies_admin`) ensures a master row always has `role='admin'`
+- **Cannot be demoted or removed** via the UI
+- **DB-enforced**: CHECK constraint `users_master_implies_admin` ensures a master row always has `role='admin'`
 - **Multiple masters supported** — co-founders can each have it
 
-### Removing master status
-
-Same SQL Editor path (no UI):
-```sql
-update public.users set is_master = false where email = '...';
-```
-
-After flipping, they can be demoted/removed via Master Control like any other admin.
-
-### Why allowlist + roles + master flag
-
-| Threat | Mitigation |
-|---|---|
-| Random Google account signs in | Lands on `/not-authorized` (not in `allowed_emails`) |
-| Compromised admin invites a rando | Worst case: rando is `viewer`; admin can't auto-promote anyone to master |
-| Compromised admin demotes a founder | Master flag blocks the demotion at API + DB layers |
-| Last admin gets demoted/removed | API rejects with "You're the only admin — promote someone else first" |
-| Master admin clicks Remove on themselves | UI disables the action; API rejects if reached |
-
 ---
 
-## Credentials (NEVER commit)
+## Environment variables
 
-These live at the repo root, gitignored:
-- `sarvam_api_key.txt`
-- `twilio_credentials.txt` (Account SID, Auth Token, +1 number)
-- `twilio_sip_password.txt` (SIP trunk outbound credential list)
-- `twilio_recovery_code.txt` (2FA recovery)
-- `vapi_api_key.txt` (legacy — Vapi pilot fallback)
-- `livekit/.env` + `dashboard/.env.local` (runtime env vars)
-
----
-
-## Cost so far
-
-| Item | Spend |
-|---|---|
-| Vapi pilot (Day 0 test call) | $0.05 (1 call) |
-| Twilio (+1 number monthly fee + first LiveKit SIP test) | ~$1.20 |
-| Sarvam credits used | 0 (98 free remaining) |
-| LiveKit Cloud | $0 (free tier — pilot well within limits) |
-| Langfuse Cloud | $0 (free tier) |
+Each service has its own `.env`/`.env.local` (all gitignored) with a checked-in `.env.example` template — `livekit/`, `dashboard/` (`.env.local.example`), `eval-runner/`, and `evals/`. Full variable-by-variable reference is in `CLAUDE.md` § Environment variables. Never commit real credentials — only the `.example` templates are tracked.
 
 ---
 
 ## What's NOT in this repo (intentional)
 
 - Caregiver web dashboard (Phase A)
+- Automatic call scheduler / retry chain (Phase A)
 - DPDP OTP proxy consent flow (Phase C)
 - OCR / Veryfi onboarding (Phase C)
-- Exotel telephony (Phase A)
+- Exotel telephony migration (Phase A)
 - WhatsApp Business API (Phase A/C)
 - Razorpay payments (Phase C)
 - Multi-language Indic activation (Phase B — Odia, Bengali, Tamil, Telugu, Malayalam)
 
-See `docs/2026-06-15-medicall-prd-trd.md` §6 Roadmap for the phased plan.
+See `PRD-TRD.md` Part VI (Phased Roadmap) for the full plan.

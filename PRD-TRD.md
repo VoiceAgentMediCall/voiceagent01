@@ -4,8 +4,8 @@
 **Version:** 3.0
 **Date:** 2026-06-21
 **Status:** Locked. Source of truth for design, vendor choice, and phased roadmap.
-**Supersedes:** `voiceagent/docs/2026-06-15-medicall-prd-trd.md` (v2 — LiveKit migration plan)
-**Companion docs:** `voiceagent/knowledge-base/livekit-stack.md` (current stack), `voiceagent/side-note.md` (open scratchpad)
+**Supersedes:** `voiceagent/docs/archive/2026-06-15-medicall-prd-trd-v2.md` (v2 — LiveKit migration plan)
+**Companion docs:** `voiceagent/knowledge-base/livekit-stack.md` (current stack), `voiceagent/docs/side-note.md` (open scratchpad)
 
 ---
 
@@ -447,7 +447,7 @@ providers:
       apiKey: $SARVAM_API_KEY
       temperature: 0.3
 prompts:
-  - file://../admin-panel/prompts.yaml#system_prompt
+  - file://../prompt-config/prompts.yaml#system_prompt
 defaultTest:
   assert:
     - type: javascript
@@ -952,4 +952,4 @@ Possibilities (not committed):
 ---
 
 *End of MediCall AI PRD/TRD v3.*
-*Companion: `voiceagent/knowledge-base/livekit-stack.md` for current stack reality. `voiceagent/side-note.md` for unresolved scratchpad items.*
+*Companion: `voiceagent/knowledge-base/livekit-stack.md` for current stack reality. `voiceagent/docs/side-note.md` for unresolved scratchpad items.*

@@ -1,0 +1,22 @@
+# cp docker-compose.override.yml.example docker-compose.override.yml
+#
+# Frees :3000/:3001 for `npm run dev`. Compose auto-loads the copy (gitignored).
+# Host side only — inter-service traffic uses service names, unaffected.
+#
+#   Dashboard   -> http://localhost:3010
+#   eval-runner -> http://localhost:3011/health
+#
+# For the containerised agent to reach the containerised dashboard, set
+# DASHBOARD_WEBHOOK_URL=http://dashboard:3000/api/webhook/livekit — not localhost.
+
+# `!override` is required — compose merges list fields by appending, so a plain
+# `ports:` would publish 3000 *and* 3010 and still collide.
+
+services:
+  dashboard:
+    ports: !override
+      - "3010:3000"
+
+  eval-runner:
+    ports: !override
+      - "3011:3001"

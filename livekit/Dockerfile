@@ -15,11 +15,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# System deps (Silero VAD / audio libs)
+# No system ffmpeg: unused (PyAV bundles its own) and its dep chain cost 420MB.
+# If codecs are ever needed, add `libavcodec61 libavformat61`, not ffmpeg.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        ffmpeg \
-        libsndfile1 \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 

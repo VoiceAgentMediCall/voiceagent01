@@ -25,6 +25,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# --- Docker local overrides (copy from docker-compose.override.yml.example) ---
+docker-compose.override.yml
+
 # --- LiveKit / Promptfoo / Streamlit caches ---
 .promptfoo/
 .streamlit/

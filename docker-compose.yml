@@ -17,6 +17,9 @@
 # eval-runner health check -> http://localhost:3001/health
 # livekit-agent has no exposed port — it makes outbound connections to
 # LiveKit Cloud only, nothing needs to reach it from outside.
+#
+# Clashes with `npm run dev` on :3000 — cp docker-compose.override.yml.example
+# docker-compose.override.yml to remap host ports.
 
 services:
   dashboard:
@@ -24,8 +27,10 @@ services:
       context: ./dashboard
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        # `:-` silences the warning on ps/logs/down. Step 2's export is still
+        # required for real builds — unset here bakes empty strings.
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
         NEXT_PUBLIC_GOOGLE_OAUTH_ENABLED: ${NEXT_PUBLIC_GOOGLE_OAUTH_ENABLED:-false}
     env_file:
       - .env
@@ -33,6 +38,13 @@ services:
     ports:
       - "3000:3000"
     restart: unless-stopped
+    healthcheck:
+      # /login, not /: the rest redirect through Supabase auth.
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
 
   eval-runner:
     build:
@@ -44,6 +56,12 @@ services:
     ports:
       - "3001:3001"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
 
   livekit-agent:
     build:
@@ -53,3 +71,10 @@ services:
       - .env
       - livekit/.env
     restart: unless-stopped
+    healthcheck:
+      # livekit-agents' worker health endpoint; container-internal only.
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8081/',timeout=3)\""]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
